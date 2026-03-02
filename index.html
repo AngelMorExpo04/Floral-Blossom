@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Floral Bloom — Arte Generativo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Courier+Prime&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --ink:#1a1108; --paper:#f5f0e8; --gold:#c8a96e; --blush:#e8c4a0; --muted:#8a7a68; }
+  html,body { height:100%; background:var(--paper); color:var(--ink); font-family:'Cormorant Garamond',Georgia,serif; overflow-x:hidden; }
+  body {
+    display:flex; flex-direction:column; align-items:center;
+    min-height:100vh; padding:40px 20px 60px;
+    background-image:
+      radial-gradient(ellipse at 20% 10%,rgba(200,169,110,.12) 0%,transparent 50%),
+      radial-gradient(ellipse at 80% 90%,rgba(232,196,160,.15) 0%,transparent 50%);
+  }
+  header { text-align:center; margin-bottom:48px; }
+  header h1 { font-size:clamp(2.4rem,6vw,4rem); font-weight:300; letter-spacing:.08em; line-height:1; }
+  header h1 em { font-style:italic; color:var(--gold); }
+  header p { margin-top:10px; font-family:'Courier Prime',monospace; font-size:.72rem; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); }
+  .divider { width:60px; height:1px; background:var(--gold); margin:16px auto 0; opacity:.6; }
+
+  .upload-zone {
+    position:relative; width:min(560px,100%);
+    border:1.5px dashed var(--gold); border-radius:2px;
+    padding:52px 32px; text-align:center; cursor:pointer;
+    transition:background .25s,border-color .25s;
+    background:rgba(200,169,110,.04);
+  }
+  .upload-zone:hover,.upload-zone.drag-over { background:rgba(200,169,110,.10); border-color:var(--ink); }
+  .upload-zone input[type="file"] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+  .upload-icon { font-size:2.4rem; margin-bottom:12px; display:block; opacity:.5; }
+  .upload-zone h2 { font-size:1.3rem; font-weight:300; letter-spacing:.04em; }
+  .upload-zone p { margin-top:6px; font-family:'Courier Prime',monospace; font-size:.68rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+
+  .canvas-wrapper { position:relative; display:none; flex-direction:column; align-items:center; gap:20px; width:100%; max-width:820px; }
+  .canvas-wrapper.visible { display:flex; }
+
+  canvas { display:block; width:100%; max-width:820px; height:auto; border:1px solid rgba(200,169,110,.4); box-shadow:0 12px 48px rgba(26,17,8,.10); }
+
+  .progress-bar { width:100%; height:2px; background:rgba(200,169,110,.2); border-radius:1px; overflow:hidden; opacity:0; transition:opacity .3s; }
+  .progress-bar.visible { opacity:1; }
+  .progress-fill { height:100%; background:linear-gradient(90deg,var(--gold),var(--blush)); width:0%; }
+
+  .sliders {
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr));
+    gap:16px 28px; width:100%;
+    background:rgba(200,169,110,.06); border:1px solid rgba(200,169,110,.3);
+    padding:20px 24px; border-radius:2px;
+  }
+  .slider-group { display:flex; flex-direction:column; gap:8px; }
+  .slider-group label {
+    font-family:'Courier Prime',monospace; font-size:.66rem;
+    letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .slider-group label .val { color:var(--ink); min-width:30px; text-align:right; }
+  input[type="range"] { -webkit-appearance:none; width:100%; height:2px; background:rgba(200,169,110,.5); outline:none; cursor:pointer; border-radius:1px; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--gold); cursor:grab; }
+  input[type="range"]::-moz-range-thumb { width:14px; height:14px; border-radius:50%; background:var(--gold); border:none; cursor:grab; }
+
+  .controls { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+  .btn { font-family:'Courier Prime',monospace; font-size:.72rem; letter-spacing:.16em; text-transform:uppercase; padding:12px 28px; border:1.5px solid var(--ink); background:transparent; color:var(--ink); cursor:pointer; transition:background .2s,color .2s; border-radius:1px; }
+  .btn:hover { background:var(--ink); color:var(--paper); }
+  .btn-gold { border-color:var(--gold); color:var(--gold); }
+  .btn-gold:hover { background:var(--gold); color:var(--paper); }
+  .btn:disabled { opacity:.35; cursor:default; pointer-events:none; }
+  .label-status { font-family:'Courier Prime',monospace; font-size:.68rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); min-height:1.2em; text-align:center; }
+
+  footer { margin-top:56px; font-family:'Courier Prime',monospace; font-size:.65rem; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); opacity:.5; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><em>Floral</em> Bloom</h1>
+  <p>Arte generativo · Los colores exactos de tu foto</p>
+  <div class="divider"></div>
+</header>
+
+<div class="upload-zone" id="uploadZone">
+  <input type="file" id="fileInput" accept="image/*">
+  <span class="upload-icon">❀</span>
+  <h2>Arrastra o elige una imagen</h2>
+  <p>JPG · PNG · WEBP · GIF</p>
+</div>
+
+<div class="canvas-wrapper" id="canvasWrapper">
+  <canvas id="canvas"></canvas>
+  <div class="progress-bar" id="progressBar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <div class="sliders">
+    <div class="slider-group">
+      <label>Tamaño flor <span class="val" id="sizeVal">28</span>px</label>
+      <input type="range" id="sizeSlider" min="5" max="80" value="28">
+    </div>
+    <div class="slider-group">
+      <label>Cobertura <span class="val" id="coverVal">110</span>%</label>
+      <input type="range" id="coverSlider" min="80" max="200" value="110">
+    </div>
+    <div class="slider-group">
+      <label>Pétalos <span class="val" id="petalVal">6</span></label>
+      <input type="range" id="petalSlider" min="3" max="14" value="6">
+    </div>
+    <div class="slider-group">
+      <label>Velocidad <span class="val" id="speedVal">5</span></label>
+      <input type="range" id="speedSlider" min="1" max="10" value="5">
+    </div>
+    <div class="slider-group">
+      <label>Opacidad <span class="val" id="opacityVal">92</span>%</label>
+      <input type="range" id="opacitySlider" min="20" max="100" value="92">
+    </div>
+    <div class="slider-group">
+      <label>Brillo color <span class="val" id="boostVal">8</span></label>
+      <input type="range" id="boostSlider" min="0" max="40" value="8">
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="replayBtn">↺ Re-generar</button>
+    <button class="btn" id="newImageBtn">↑ Nueva imagen</button>
+    <button class="btn btn-gold" id="downloadBtn" disabled>↓ Descargar PNG</button>
+  </div>
+  <span class="label-status" id="statusLabel"></span>
+</div>
+
+<footer>Vanilla JS · Canvas API · Sin dependencias externas</footer>
+
+<script>
+(function () {
+
+  var fileInput     = document.getElementById('fileInput');
+  var uploadZone    = document.getElementById('uploadZone');
+  var canvasWrapper = document.getElementById('canvasWrapper');
+  var canvas        = document.getElementById('canvas');
+  var ctx           = canvas.getContext('2d', { willReadFrequently: true });
+  var progressBar   = document.getElementById('progressBar');
+  var progressFill  = document.getElementById('progressFill');
+  var downloadBtn   = document.getElementById('downloadBtn');
+  var replayBtn     = document.getElementById('replayBtn');
+  var newImageBtn   = document.getElementById('newImageBtn');
+  var statusLabel   = document.getElementById('statusLabel');
+
+  // Sliders config
+  var sliderDefs = [
+    { id: 'size',    valId: 'sizeVal'  },
+    { id: 'cover',   valId: 'coverVal' },
+    { id: 'petal',   valId: 'petalVal' },
+    { id: 'speed',   valId: 'speedVal' },
+    { id: 'opacity', valId: 'opacityVal'},
+    { id: 'boost',   valId: 'boostVal' },
+  ];
+  var S = {};
+  sliderDefs.forEach(function(d) {
+    S[d.id] = {
+      el:  document.getElementById(d.id + 'Slider'),
+      val: document.getElementById(d.valId)
+    };
+    S[d.id].el.addEventListener('input', function() {
+      S[d.id].val.textContent = S[d.id].el.value;
+    });
+    S[d.id].el.addEventListener('change', function() {
+      if (sourceImage) startBloom();
+    });
+  });
+
+  var sourceImage = null;
+  var animFrame   = null;
+  var animRunning = false;
+  var pixelData   = null;
+  var imgW = 0, imgH = 0;
+
+  // ── Upload / drag ────────────────────────────────────────
+  uploadZone.addEventListener('dragover', function(e) { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+  uploadZone.addEventListener('dragleave', function() { uploadZone.classList.remove('drag-over'); });
+  uploadZone.addEventListener('drop', function(e) {
+    e.preventDefault(); uploadZone.classList.remove('drag-over');
+    var f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('image/')) loadImage(f);
+  });
+  fileInput.addEventListener('change', function() { if (fileInput.files[0]) loadImage(fileInput.files[0]); });
+
+  newImageBtn.addEventListener('click', function() {
+    cancelAnim();
+    uploadZone.style.display = '';
+    canvasWrapper.classList.remove('visible');
+    fileInput.value = '';
+    sourceImage = null;
+  });
+  replayBtn.addEventListener('click', function() { if (sourceImage) startBloom(); });
+  downloadBtn.addEventListener('click', function() {
+    var a = document.createElement('a');
+    a.download = 'floral-bloom.png';
+    a.href = canvas.toDataURL('image/png');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  });
+
+  // ── Load ────────────────────────────────────────────────
+  function loadImage(file) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onload = function() {
+        sourceImage = img;
+        var maxW = 1000;
+        var w = img.naturalWidth, h = img.naturalHeight;
+        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+        canvas.width = w; canvas.height = h;
+        imgW = w; imgH = h;
+
+        // Cache full-res pixel data once
+        var tmp = document.createElement('canvas');
+        tmp.width = w; tmp.height = h;
+        var tc = tmp.getContext('2d');
+        tc.drawImage(img, 0, 0, w, h);
+        pixelData = tc.getImageData(0, 0, w, h).data;
+
+        uploadZone.style.display = 'none';
+        canvasWrapper.classList.add('visible');
+        startBloom();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ── Sample pixel (exact color from image) ───────────────
+  function samplePixel(x, y) {
+    var px = Math.max(0, Math.min(imgW - 1, Math.round(x)));
+    var py = Math.max(0, Math.min(imgH - 1, Math.round(y)));
+    var i = (py * imgW + px) * 4;
+    return { r: pixelData[i], g: pixelData[i+1], b: pixelData[i+2] };
+  }
+
+  // ── Average color over a small region (more faithful) ───
+  function sampleRegion(x, y, r) {
+    var rr = Math.ceil(r);
+    var rSum = 0, gSum = 0, bSum = 0, count = 0;
+    var step = Math.max(1, Math.round(rr / 3));
+    for (var dy = -rr; dy <= rr; dy += step) {
+      for (var dx = -rr; dx <= rr; dx += step) {
+        if (dx*dx + dy*dy > rr*rr) continue;
+        var p = samplePixel(x + dx, y + dy);
+        rSum += p.r; gSum += p.g; bSum += p.b; count++;
+      }
+    }
+    if (count === 0) return samplePixel(x, y);
+    return { r: rSum/count, g: gSum/count, b: bSum/count };
+  }
+
+  // ── RGB → CSS rgba string with optional sat boost ───────
+  function colorStr(r, g, b, alpha, satBoost) {
+    // Convert to HSL, apply boost, back to rgb string
+    r /= 255; g /= 255; b /= 255;
+    var max = Math.max(r,g,b), min = Math.min(r,g,b);
+    var h = 0, s = 0, l = (max+min)/2;
+    if (max !== min) {
+      var d = max - min;
+      s = l > 0.5 ? d/(2-max-min) : d/(max+min);
+      if (max === r)      h = ((g-b)/d + (g<b?6:0))/6;
+      else if (max === g) h = ((b-r)/d + 2)/6;
+      else                h = ((r-g)/d + 4)/6;
+    }
+    s = Math.min(1, s + satBoost/100);
+    return 'hsla(' + Math.round(h*360) + ',' + Math.round(s*100) + '%,' + Math.round(l*100) + '%,' + alpha + ')';
+  }
+
+  function rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    var max = Math.max(r,g,b), min = Math.min(r,g,b);
+    var h = 0, s = 0, l = (max+min)/2;
+    if (max !== min) {
+      var d = max-min;
+      s = l > 0.5 ? d/(2-max-min) : d/(max+min);
+      if (max === r)      h = ((g-b)/d + (g<b?6:0))/6;
+      else if (max === g) h = ((b-r)/d + 2)/6;
+      else                h = ((r-g)/d + 4)/6;
+    }
+    return [h*360, s*100, l*100];
+  }
+
+  // ── BLOOM ────────────────────────────────────────────────
+  function cancelAnim() {
+    if (animFrame) cancelAnimationFrame(animFrame);
+    animRunning = false;
+  }
+
+  function startBloom() {
+    cancelAnim();
+    downloadBtn.disabled = true;
+    statusLabel.textContent = 'Floreciendo…';
+
+    var W = canvas.width, H = canvas.height;
+    var cx = W/2, cy = H/2;
+
+    // Read sliders
+    var maxRadius  = parseInt(S.size.el.value);
+    var coverPct   = parseInt(S.cover.el.value) / 100;  // e.g. 1.1 = 110%
+    var basePetals = parseInt(S.petal.el.value);
+    var speed      = parseInt(S.speed.el.value);
+    var alpha      = parseInt(S.opacity.el.value) / 100;
+    var satBoost   = parseInt(S.boost.el.value);
+
+    // ── KEY FIX: grid cell = flower diameter × coverage factor ──
+    // This guarantees full coverage regardless of size.
+    // cellSize = how far apart flower centers are
+    var cellSize = maxRadius * 1.6 / coverPct;
+    cellSize = Math.max(2, cellSize);
+
+    var cols = Math.ceil(W / cellSize) + 1;
+    var rows = Math.ceil(H / cellSize) + 1;
+
+    // Dark background
+    ctx.fillStyle = '#0d0d0d';
+    ctx.fillRect(0, 0, W, H);
+
+    var flowers = [];
+    for (var row = 0; row < rows; row++) {
+      for (var col = 0; col < cols; col++) {
+        // Offset alternate rows (hexagonal packing = better coverage)
+        var offsetX = (row % 2 === 0) ? 0 : cellSize * 0.5;
+        var gx = col * cellSize + offsetX + (Math.random() - 0.5) * cellSize * 0.35;
+        var gy = row * cellSize            + (Math.random() - 0.5) * cellSize * 0.35;
+
+        // Keep flowers that are close enough to canvas (allow slight bleed)
+        if (gx < -maxRadius || gx > W + maxRadius || gy < -maxRadius || gy > H + maxRadius) continue;
+
+        var fx = Math.max(-maxRadius, Math.min(W + maxRadius, gx));
+        var fy = Math.max(-maxRadius, Math.min(H + maxRadius, gy));
+        var dist = Math.sqrt((fx-cx)*(fx-cx) + (fy-cy)*(fy-cy));
+
+        // Sample average color over the flower's footprint
+        var pix = sampleRegion(fx, fy, maxRadius * 0.5);
+        var hsl = rgbToHsl(pix.r, pix.g, pix.b);
+
+        flowers.push({
+          x: fx, y: fy, dist: dist,
+          petals: Math.max(3, basePetals + Math.floor(Math.random()*3) - 1),
+          maxR: maxRadius * (0.6 + Math.random() * 0.55),
+          currentR: 0,
+          growSpeed: (0.4 + Math.random() * 0.8) * (speed * 0.5),
+          // Store raw RGB for gradient use
+          r: pix.r, g: pix.g, b: pix.b,
+          hue: hsl[0], sat: hsl[1], lit: hsl[2],
+          satBoost: satBoost,
+          alpha: alpha * (0.82 + Math.random() * 0.18),
+          rotation: Math.random() * Math.PI * 2,
+          style: Math.random() > 0.45 ? 'pointed' : 'round',
+          done: false
+        });
+      }
+    }
+
+    // Sort center-outward so bloom grows from middle
+    flowers.sort(function(a, b) { return a.dist - b.dist; });
+
+    // Staggered delays: spread over ~60 frames proportional to distance
+    var maxD = flowers[flowers.length - 1].dist || 1;
+    flowers.forEach(function(f, i) {
+      // Distance-based delay (center = 0, edges = later)
+      f.delay = (f.dist / maxD) * 55 + Math.random() * 4;
+    });
+
+    var total = flowers.length;
+    var frame = 0;
+    animRunning = true;
+    progressBar.classList.add('visible');
+    progressFill.style.width = '0%';
+
+    function tick() {
+      if (!animRunning) return;
+      frame++;
+
+      // Repaint dark background
+      ctx.fillStyle = '#0c0c0c';
+      ctx.fillRect(0, 0, W, H);
+
+      // Very faint original image ghost (helps show reference, barely visible)
+      ctx.globalAlpha = 0.05;
+      ctx.drawImage(sourceImage, 0, 0, W, H);
+      ctx.globalAlpha = 1;
+
+      var doneCount = 0;
+      for (var j = 0; j < total; j++) {
+        var f = flowers[j];
+        if (frame < f.delay) continue;
+        if (f.currentR < f.maxR) {
+          f.currentR = Math.min(f.maxR, f.currentR + f.growSpeed);
+        } else {
+          f.done = true;
+        }
+        if (f.done) doneCount++;
+        drawFlower(f);
+      }
+
+      progressFill.style.width = (doneCount / total * 100).toFixed(1) + '%';
+
+      if (doneCount === total) {
+        animRunning = false;
+        progressBar.classList.remove('visible');
+        downloadBtn.disabled = false;
+        statusLabel.textContent = '✦ Listo — puedes descargar';
+        return;
+      }
+      animFrame = requestAnimationFrame(tick);
+    }
+
+    animFrame = requestAnimationFrame(tick);
+  }
+
+  // ── Draw one flower ──────────────────────────────────────
+  function drawFlower(f) {
+    if (f.currentR < 0.4) return;
+
+    ctx.save();
+    ctx.globalAlpha = f.alpha;
+    ctx.translate(f.x, f.y);
+    ctx.rotate(f.rotation);
+
+    var pLen = f.currentR;
+    var pW   = f.currentR * 0.46;
+    var boost = f.satBoost;
+
+    // Slightly lighter version for inner gradient (same hue, more luminosity)
+    var innerLit = Math.min(88, f.lit + 22);
+    var innerSat = Math.min(100, f.sat + boost * 0.5);
+
+    var innerColor = 'hsla(' + Math.round(f.hue) + ',' + Math.round(innerSat) + '%,' + Math.round(innerLit) + '%, 1)';
+
+    for (var p = 0; p < f.petals; p++) {
+      var angle = (p / f.petals) * Math.PI * 2;
+
+      // Each petal samples a slightly offset color for micro variation
+      var px = f.x + Math.cos(f.rotation + angle) * pLen * 0.5;
+      var py = f.y + Math.sin(f.rotation + angle) * pLen * 0.5;
+      var pp = sampleRegion(px, py, 2);
+      var pph = rgbToHsl(pp.r, pp.g, pp.b);
+      var petalSat = Math.min(100, pph[1] + boost);
+      var petalLit = Math.max(18, Math.min(78, pph[2]));
+
+      var tipColor  = 'hsla(' + Math.round(pph[0]) + ',' + Math.round(petalSat) + '%,' + Math.round(petalLit) + '%, 0.22)';
+      var midColor  = 'hsla(' + Math.round(pph[0]) + ',' + Math.round(petalSat) + '%,' + Math.round(petalLit) + '%, 0.92)';
+
+      ctx.save();
+      ctx.rotate(angle);
+
+      var grad = ctx.createLinearGradient(0, 0, 0, pLen);
+      grad.addColorStop(0,    innerColor);
+      grad.addColorStop(0.42, midColor);
+      grad.addColorStop(1,    tipColor);
+
+      ctx.beginPath();
+      if (f.style === 'pointed') {
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(-pW, pLen * 0.35, -pW * 0.55, pLen * 0.82, 0, pLen);
+        ctx.bezierCurveTo( pW * 0.55, pLen * 0.82,  pW, pLen * 0.35, 0, 0);
+      } else {
+        ctx.ellipse(0, pLen * 0.5, pW, pLen * 0.5, 0, 0, Math.PI * 2);
+      }
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Center disc
+    if (f.currentR > 2) {
+      var cr = f.currentR * 0.19;
+      var cg = ctx.createRadialGradient(0, 0, 0, 0, 0, cr);
+      var cInner = 'hsla(' + Math.round(f.hue) + ',70%,90%,1)';
+      var cOuter = 'hsla(' + Math.round(f.hue) + ',' + Math.round(Math.min(100, f.sat + boost)) + '%,' + Math.round(f.lit) + '%,0.8)';
+      cg.addColorStop(0, cInner);
+      cg.addColorStop(1, cOuter);
+      ctx.beginPath();
+      ctx.arc(0, 0, cr, 0, Math.PI * 2);
+      ctx.fillStyle = cg;
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+})();
+</script>
+</body>
+</html>
